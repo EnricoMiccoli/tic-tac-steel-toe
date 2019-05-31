@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import numpy as np
+import os
 import pickle
 import sys
 import time
@@ -232,8 +233,8 @@ if __name__ == "__main__":
                 print("Quitting")
                 exit(0)
         bmap = brain_map()
-        with open(brainfile, "wb") as f:
-            print("Saving base brain in {}".format(brainfile))
+        with open(args.brainfile1, "wb") as f:
+            print("Saving base brain in {}".format(args.brainfile1))
             pickle.dump(bmap, f)
         exit(0)
 
