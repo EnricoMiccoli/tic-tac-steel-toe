@@ -4,7 +4,6 @@ import logging
 import numpy as np
 import os
 import pickle
-import sys
 import time
 
 # Learning parameters
@@ -164,7 +163,7 @@ def self_play(brain_map1, brain_map2):
         state = state[:cmov] + "2" + state[cmov + 1 :]
         print_state(state)
         result = game_result(state)
-        if result != False:
+        if result != 0:
             break
         # Computer 2 moves
         cmov = cogitate(state, brain_map2)
@@ -173,7 +172,7 @@ def self_play(brain_map1, brain_map2):
         state = state[:cmov] + "1" + state[cmov + 1 :]
         print_state(state)
         result = game_result(state)
-        if result != False:
+        if result != 0:
             break
     print_state(state)
     if result == 1:
@@ -213,7 +212,7 @@ def play_human(brain_map):
             print("Cell already taken")
             continue
         result = game_result(state)
-        if result != False:
+        if result != 0:
             break
         # Computer's move
         cmov = cogitate(state, brain_map)
@@ -222,7 +221,7 @@ def play_human(brain_map):
         state = state[:cmov] + "1" + state[cmov + 1 :]
         print_state(state)
         result = game_result(state)
-        if result != False:
+        if result != 0:
             break
     print_state(state)
     if result == 1:
@@ -256,13 +255,12 @@ if __name__ == "__main__":
 
     brainmap1 = load_brain(args.brainfile1)
     computer_match = args.brainfile2 is not None
-    if computer_match:
-        brainmap2 = load_brain(args.brainfile2)
-    n = args.iterations
     training = args.train_both
 
     if computer_match:
+        brainmap2 = load_brain(args.brainfile2)
         if training:
+            n = args.iterations
             logging.info("Starting self training")
             start = time.monotonic()
             self_train(brainmap1, brainmap2, n)
