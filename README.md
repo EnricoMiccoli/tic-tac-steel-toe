@@ -21,6 +21,8 @@ optional arguments:
                         5000
   -q, --quiet           don't print while training
   -g, --generate        write an empty brainfile to FILE
+  -f, --force           overwrite without asking when generating base
+                        brainfiles
 ```
 
 To run for the first time:
