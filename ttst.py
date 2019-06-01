@@ -98,7 +98,7 @@ def load_brain(brainfile):
         with open(brainfile, "rb") as data:
             brainmap = pickle.load(data)
     except FileNotFoundError:
-        logging.critical(f"File {brainfile1} not found")
+        logging.critical(f"File {brainfile} not found")
         exit(1)
     except pickle.UnpicklingError:
         logging.critical(f"Malformed brainfile in {brainfile}")
