@@ -1,5 +1,6 @@
 import argparse
 import itertools
+import logging
 import numpy as np
 import os
 import pickle
@@ -14,6 +15,8 @@ DEFAULT_TRAINING = 5000
 
 # User interface theme
 CHARS = {"0": " ", "1": "X", "2": "O"}
+logging.basicConfig(format="%(message)s")
+
 
 # Command line interface
 parser = argparse.ArgumentParser(
@@ -48,6 +51,12 @@ parser.add_argument(
 parser.add_argument(
     "-g", "--generate", action="store_true", help="write an empty brainfile to FILE"
 )
+parser.add_argument(
+    "-f",
+    "--force",
+    action="store_true",
+    help="overwrite without asking when generating base brainfiles",
+)
 
 
 # Base brain generator
@@ -63,6 +72,8 @@ def brain_map():
 
 # Input Output
 def print_state(state):
+    if not logging.getLogger().isEnabledFor(logging.DEBUG):
+        return
     print()
     print(" | ".join([CHARS[state[x]] for x in [6, 7, 8]]))
     print("---------")
@@ -87,10 +98,10 @@ def load_brain(brainfile):
         with open(brainfile, "rb") as data:
             brainmap = pickle.load(data)
     except FileNotFoundError:
-        print(f"File {brainfile1} not found")
+        logging.critical(f"File {brainfile1} not found")
         exit(1)
     except pickle.UnpicklingError:
-        print(f"Malformed brainfile in {brainfile}")
+        logging.critical(f"Malformed brainfile in {brainfile}")
         exit(1)
     return brainmap
 
@@ -166,10 +177,10 @@ def self_play(brain_map1, brain_map2):
             break
     print_state(state)
     if result == 1:
-        print("Computer 2 wins!")
+        logging.debug("Computer 2 wins!")
         return True, moves
     else:
-        print("Computer 1 wins!")
+        logging.debug("Computer 1 wins!")
         return False, moves
 
 
@@ -226,7 +237,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.generate:
-        if os.path.isfile(args.brainfile1):
+        if not args.force and os.path.isfile(args.brainfile1):
             print(f"Brainfile {args.brainfile1} already exists")
             answer = input("Overwrite? [y/N] ")
             if answer != "y":
@@ -238,6 +249,11 @@ if __name__ == "__main__":
             pickle.dump(bmap, f)
         exit(0)
 
+    if args.quiet:
+        logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     brainmap1 = load_brain(args.brainfile1)
     computer_match = args.brainfile2 is not None
     if computer_match:
@@ -247,19 +263,19 @@ if __name__ == "__main__":
 
     if computer_match:
         if training:
-            print("Starting self training")
+            logging.info("Starting self training")
             start = time.monotonic()
             self_train(brainmap1, brainmap2, n)
             end = time.monotonic()
-            print(f"Trained {n} matches in {end - start:.3f} seconds")
+            logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
             with open(args.brainfile1, "wb") as f:
-                print("Saving brain updates for computer 1")
+                logging.info("Saving brain updates for computer 1")
                 pickle.dump(brainmap1, f)
             with open(args.brainfile2, "wb") as f:
-                print("Saving brain updates for computer 2")
+                logging.info("Saving brain updates for computer 2")
                 pickle.dump(brainmap2, f)
         else:
             raise NotImplementedError
     else:
-        print("Playing human against computer")
+        logging.info("Playing human against computer")
         play_human(brainmap1)
