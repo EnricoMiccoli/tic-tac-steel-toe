@@ -82,6 +82,16 @@ def print_state(state):
     print()
 
 
+def print_tutorial():
+    print()
+    print("7 | 8 | 9 ")
+    print("---------")
+    print("4 | 5 | 6 ")
+    print("---------")
+    print("1 | 2 | 3 ")
+    print()
+
+
 def parse_move_linear(instr):
     try:
         x = int(instr)
@@ -205,7 +215,7 @@ def self_train(brainmap1, brainmap2, n, training_both):
 def play_human(brain_map):
     state = "000000000"
     moves = []
-    print_state(state)
+    print_tutorial()
     while True:
         # Human's move
         move = input(">>> ")
