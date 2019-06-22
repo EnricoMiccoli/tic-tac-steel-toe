@@ -183,15 +183,23 @@ def self_play(brain_map1, brain_map2):
         return False, moves
 
 
-def self_train(brainmap1, brainmap2, n):
-    for i in range(n):
-        result, moves = self_play(brainmap1, brainmap2)
-        if result:
-            update_brain(brainmap2, moves[1], REWARD)
-            update_brain(brainmap1, moves[0], PENALTY)
-        else:
-            update_brain(brainmap2, moves[1], PENALTY)
-            update_brain(brainmap1, moves[0], REWARD)
+def self_train(brainmap1, brainmap2, n, training_both):
+    if training_both:
+        for i in range(n):
+            result, moves = self_play(brainmap1, brainmap2)
+            if result:
+                update_brain(brainmap2, moves[1], REWARD)
+                update_brain(brainmap1, moves[0], PENALTY)
+            else:
+                update_brain(brainmap2, moves[1], PENALTY)
+                update_brain(brainmap1, moves[0], REWARD)
+    else:
+        for i in range(n):
+            result, moves = self_play(brainmap1, brainmap2)
+            if result:
+                update_brain(brainmap1, moves[0], PENALTY)
+            else:
+                update_brain(brainmap1, moves[0], REWARD)
 
 
 def play_human(brain_map):
@@ -255,25 +263,22 @@ if __name__ == "__main__":
 
     brainmap1 = load_brain(args.brainfile1)
     computer_match = args.brainfile2 is not None
-    training = args.train_both
 
     if computer_match:
         brainmap2 = load_brain(args.brainfile2)
-        if training:
-            n = args.iterations
-            logging.info("Starting self training")
-            start = time.monotonic()
-            self_train(brainmap1, brainmap2, n)
-            end = time.monotonic()
-            logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
-            with open(args.brainfile1, "wb") as f:
-                logging.info("Saving brain updates for computer 1")
-                pickle.dump(brainmap1, f)
+        n = args.iterations
+        logging.info("Starting self training")
+        start = time.monotonic()
+        self_train(brainmap1, brainmap2, n, args.train_both)
+        end = time.monotonic()
+        logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
+        with open(args.brainfile1, "wb") as f:
+            logging.info("Saving brain updates for computer 1")
+            pickle.dump(brainmap1, f)
+        if args.train_both:
             with open(args.brainfile2, "wb") as f:
                 logging.info("Saving brain updates for computer 2")
                 pickle.dump(brainmap2, f)
-        else:
-            raise NotImplementedError
     else:
         logging.info("Playing human against computer")
         play_human(brainmap1)
