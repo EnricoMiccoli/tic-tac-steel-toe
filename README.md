@@ -6,33 +6,45 @@ This is the most straightforward, unsophisticated, software implementation of a 
 
 ## Usage
 ```
-ttst.py [-h] [-t FILE] [-T] [-n INT] [-q] [-g] FILE
+usage: ttst.py [-h] [-p1 P1] [-p2 P2] [-t1 P1] [-t2 P2] [-n INT] [-q]
+               [-g FILE] [-f]
 
-positional arguments:
-  FILE                  brain file to play against
+Play tic-tac-toe against a reinforcement learning agent. If no brainfile is
+specified for a given player, then that player is assumed to be a human.
 
 optional arguments:
   -h, --help            show this help message and exit
-  -t FILE, --train FILE
-                        second brainfile to play computer against computer
-  -T, --train-both      update both brainfiles after training
+  -p1 P1, --player1 P1  brainfile for the first player
+  -p2 P2, --player2 P2  brainfile for the second player
+  -t1 P1, --train1 P1   brainfile to train as a first player
+  -t2 P2, --train2 P2   brainfile to train as a second player
   -n INT, --iterations INT
                         how many matches to play during training, default is
                         5000
   -q, --quiet           don't print while training
-  -g, --generate        write an empty brainfile to FILE
+  -g FILE, --generate FILE
+                        write an empty brainfile to FILE
   -f, --force           overwrite without asking when generating base
                         brainfiles
 ```
 
 To run for the first time:
 ```
-$ python ssts.py -g brain1.pickle
-$ python ssts.py -g brain2.pickle
-$ python ssts.py brain1.pickle -T -t brain2.pickle -n 10000
-$ python ssts.py brain2.pickle
+$ python ttst.py -g brain1.pickle
+$ python ttst.py -g brain2.pickle
+$ python ttst.py -t1 brain1.pickle -t2 brain2.pickle -n 10000
+$ python ttst.py -p2 brain2.pickle
 ```
 If you are winning most of the matches, try training with a higher `n`.
 
-When you run `$ python ssts.py brain1.pickle -T -t brain2.pickle` you are training two models at the same time, brain1 will be a good first player, brain2 a good second player. A tie is considered a win for the second player.
+When you run `$ python ttst.py -t1 brain1.pickle -t2 brain2.pickle` you are training two models at the same time, brain1 will be a good first player, brain2 a good second player. A tie is considered a win for the second player.
 
+## More examples
+### Play against the computer without training it
+Human goes first `$ python ttst.py -p1 brain.pickle`    
+Computer goes first `$ python ttst.py -p2 brain.pickle`
+
+### Play against a friend in your terminal
+```
+$ python ttst.py
+```

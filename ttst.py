@@ -6,6 +6,8 @@ import os
 import pickle
 import time
 
+EMPTY_BOARD = "000000000"
+
 # Learning parameters
 START_WEIGHT = 6
 PENALTY = -1
@@ -19,22 +21,22 @@ logging.basicConfig(format="%(message)s")
 
 # Command line interface
 parser = argparse.ArgumentParser(
-    description="Play tic-tac-toe against a reinforcement learning agent"
-)
-
-parser.add_argument("brainfile1", metavar="FILE", help="brain file to play against")
-parser.add_argument(
-    "-t",
-    "--train",
-    metavar="FILE",
-    dest="brainfile2",
-    help="second brainfile to play computer against computer",
+    description=("Play tic-tac-toe against a reinforcement learning agent."
+        " If no brainfile is specified for a given player,"
+        " then that player is assumed to be a human."
+        )
 )
 parser.add_argument(
-    "-T",
-    "--train-both",
-    action="store_true",
-    help="update both brainfiles after training",
+    "-p1", "--player1", metavar="P1", help="brainfile for the first player"
+)
+parser.add_argument(
+    "-p2", "--player2", metavar="P2", help="brainfile for the second player"
+)
+parser.add_argument(
+    "-t1", "--train1", metavar="P1", help="brainfile to train as a first player"
+)
+parser.add_argument(
+    "-t2", "--train2", metavar="P2", help="brainfile to train as a second player"
 )
 parser.add_argument(
     "-n",
@@ -48,7 +50,7 @@ parser.add_argument(
     "-q", "--quiet", action="store_true", help="don't print while training"
 )
 parser.add_argument(
-    "-g", "--generate", action="store_true", help="write an empty brainfile to FILE"
+    "-g", "--generate", metavar="FILE", help="write an empty brainfile to FILE"
 )
 parser.add_argument(
     "-f",
@@ -100,6 +102,21 @@ def parse_move_linear(instr):
     if x not in range(1, 10):
         raise ValueError
     return x - 1
+
+
+def read_human_move(state):
+    while True:
+        move = input(">>> ")
+        try:
+            hmov = parse_move_linear(move)
+        except ValueError:
+            print("Invalid input, please enter number 1-9")
+            continue
+        if state[hmov] == "0":
+            return hmov
+        else:
+            print("Cell already taken")
+            continue
 
 
 def load_brain(brainfile):
@@ -158,111 +175,169 @@ def cogitate(state, brain_map):
     return np.random.choice(9, 1, p=distribution)[0]
 
 
+def make_human_move(player_id, state):
+    hmov = read_human_move(state)
+    assert state[hmov] == "0"
+    updated = state[:hmov] + player_id + state[hmov + 1 :]
+    return updated
+
+
+def make_computer_move(player_id, brainmap, state):
+    cmov = cogitate(state, brainmap)
+    assert state[cmov] == "0"
+    updated = state[:cmov] + player_id + state[cmov + 1 :]
+    return cmov, updated
+
+
 # Playing and training
 def self_play(brain_map1, brain_map2):
     state = "000000000"
-    moves1 = []
-    moves2 = []
-    moves = [moves1, moves2]
+    moves = [[], []]
     print_state(state)
-    while True:
-        # Computer 1 moves
-        cmov = cogitate(state, brain_map1)
-        assert state[cmov] == "0"
-        moves1.append((state, cmov))
-        state = state[:cmov] + "2" + state[cmov + 1 :]
-        print_state(state)
-        result = game_result(state)
-        if result != 0:
-            break
-        # Computer 2 moves
-        cmov = cogitate(state, brain_map2)
-        assert state[cmov] == "0"
-        moves2.append((state, cmov))
-        state = state[:cmov] + "1" + state[cmov + 1 :]
-        print_state(state)
-        result = game_result(state)
-        if result != 0:
-            break
-    print_state(state)
+    result = 0
+    while result == 0:
+        iterators = zip(["2", "1"], [brain_map1, brain_map2], moves)
+        for player_id, brainmap, mv in iterators:
+            move, updated = make_computer_move(player_id, brainmap, state)
+            mv.append((state, move))
+            state = updated
+            print_state(state)
+            result = game_result(state)
+            if result != 0:
+                break
     if result == 1:
         logging.debug("Computer 2 wins!")
         return True, moves
     else:
+        assert result == 2
         logging.debug("Computer 1 wins!")
         return False, moves
 
 
-def self_train(brainmap1, brainmap2, n, training_both):
-    if training_both:
-        for i in range(n):
-            result, moves = self_play(brainmap1, brainmap2)
-            if result:
-                update_brain(brainmap2, moves[1], REWARD)
-                update_brain(brainmap1, moves[0], PENALTY)
-            else:
-                update_brain(brainmap2, moves[1], PENALTY)
-                update_brain(brainmap1, moves[0], REWARD)
-    else:
-        for i in range(n):
-            result, moves = self_play(brainmap1, brainmap2)
-            if result:
-                update_brain(brainmap1, moves[0], PENALTY)
-            else:
-                update_brain(brainmap1, moves[0], REWARD)
-
-
-def play_human(brain_map):
-    state = "000000000"
-    moves = []
-    print_tutorial()
-    while True:
-        # Human's move
-        move = input(">>> ")
-        try:
-            hmov = parse_move_linear(move)
-        except ValueError:
-            print("Invalid input, please enter number 1-9")
-            continue
-        if state[hmov] == "0":
-            state = state[:hmov] + "2" + state[hmov + 1 :]
+def self_train(brainmap1, brainmap2, n, training1, training2):
+    for i in range(n):
+        result, moves = self_play(brainmap1, brainmap2)
+        if result:
+            update_brain(brainmap2, moves[1], REWARD) if training2 else None
+            update_brain(brainmap1, moves[0], PENALTY) if training1 else None
         else:
-            print("Cell already taken")
-            continue
-        result = game_result(state)
-        if result != 0:
-            break
-        # Computer's move
-        cmov = cogitate(state, brain_map)
-        assert state[cmov] == "0"
-        moves.append((state, cmov))
-        state = state[:cmov] + "1" + state[cmov + 1 :]
-        print_state(state)
-        result = game_result(state)
-        if result != 0:
-            break
-    print_state(state)
-    if result == 1:
+            update_brain(brainmap2, moves[1], PENALTY) if training2 else None
+            update_brain(brainmap1, moves[0], REWARD) if training1 else None
+
+
+def play_human_computer(brainmap, humanfirst, training):
+    if humanfirst:
+        print("Playing human against computer")
+    else:
+        print("Playing computer against human")
+
+    print_tutorial()
+    state = EMPTY_BOARD
+    mv = []
+
+    # TODO use currying instead
+    def _make_computer_move(player_id, state):
+        return make_computer_move(player_id, brainmap, state)
+
+    movers = [make_human_move, _make_computer_move]
+    ts = [0, training]
+    humans = [1, 0]
+    if not humanfirst:
+        movers.reverse()
+        ts.reverse()
+        humans.reverse()
+
+    result = 0
+    while result == 0:
+        for player_id, mover, t, human in zip(["2", "1"], movers, ts, humans):
+            update = mover(player_id, state)
+            if human:
+                state = update
+            else:
+                mv.append((state, update[0]))
+                state = update[1]
+            print_state(state)
+            result = game_result(state)
+            if result != 0:
+                break
+
+    if (result == 1 and humanfirst) or (result == 2 and not humanfirst):
         print("Computer wins!")
-        return True, moves
+        update_brain(brainmap, mv, REWARD) if training else None
     else:
         print("You win!")
-        return False, moves
+        update_brain(brainmap, mv, PENALTY) if training else None
+
+
+def play_humans():
+    state = "000000000"
+    print("Playing human against human")
+    print_tutorial()
+    result = 0
+    while result == 0:
+        for player_id in ["2", "1"]:
+            state = make_human_move(player_id, state)
+            print_state(state)
+            result = game_result(state)
+            if result != 0:
+                break
+    if result == 1:
+        print("X wins!")
+    else:
+        assert result == 2
+        print("O wins!")
+
+
+def play(p1, p2, t1, t2, n):  # path path bool bool int
+
+    # Load files
+    if p1 is not None:
+        brainmap1 = load_brain(p1)
+    if p2 is not None:
+        brainmap2 = load_brain(p2)
+
+    # Play
+    if p1 is None and p2 is None:
+        play_humans()
+        return
+    elif p1 is not None and p2 is not None:
+        logging.info(f"Playing computer {p1} against computer {p2}")
+        start = time.monotonic()
+        self_train(brainmap1, brainmap2, n, t1, t2)
+        end = time.monotonic()
+        if t1 or t2:
+            logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
+    elif p1 is not None:
+        play_human_computer(brainmap1, 0, t1)
+    elif p2 is not None:
+        play_human_computer(brainmap2, 1, t2)
+    else:
+        assert False
+
+    # Update
+    if t1:
+        with open(p1, "wb") as f:
+            logging.info("Saving brain updates for computer 1")
+            pickle.dump(brainmap1, f)
+    if t2:
+        with open(p2, "wb") as f:
+            logging.info("Saving brain updates for computer 2")
+            pickle.dump(brainmap2, f)
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    if args.generate:
-        if not args.force and os.path.isfile(args.brainfile1):
-            print(f"Brainfile {args.brainfile1} already exists")
+    if args.generate is not None:
+        if not args.force and os.path.isfile(args.generate):
+            print(f"Brainfile {args.generate} already exists")
             answer = input("Overwrite? [y/N] ")
             if answer != "y":
                 print("Quitting")
                 exit(0)
         bmap = brain_map()
-        with open(args.brainfile1, "wb") as f:
-            print("Saving base brain in {}".format(args.brainfile1))
+        with open(args.generate, "wb") as f:
+            print(f"Saving base brain in {args.generate}")
             pickle.dump(bmap, f)
         exit(0)
 
@@ -271,24 +346,9 @@ if __name__ == "__main__":
     else:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    brainmap1 = load_brain(args.brainfile1)
-    computer_match = args.brainfile2 is not None
+    p1 = args.player1 or args.train1
+    p2 = args.player2 or args.train2
+    t1 = args.train1 is not None
+    t2 = args.train2 is not None
 
-    if computer_match:
-        brainmap2 = load_brain(args.brainfile2)
-        n = args.iterations
-        logging.info("Starting self training")
-        start = time.monotonic()
-        self_train(brainmap1, brainmap2, n, args.train_both)
-        end = time.monotonic()
-        logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
-        with open(args.brainfile1, "wb") as f:
-            logging.info("Saving brain updates for computer 1")
-            pickle.dump(brainmap1, f)
-        if args.train_both:
-            with open(args.brainfile2, "wb") as f:
-                logging.info("Saving brain updates for computer 2")
-                pickle.dump(brainmap2, f)
-    else:
-        logging.info("Playing human against computer")
-        play_human(brainmap1)
+    play(p1, p2, t1, t2, args.iterations)
