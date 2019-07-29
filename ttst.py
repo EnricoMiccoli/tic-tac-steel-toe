@@ -21,10 +21,11 @@ logging.basicConfig(format="%(message)s")
 
 # Command line interface
 parser = argparse.ArgumentParser(
-    description=("Play tic-tac-toe against a reinforcement learning agent."
+    description=(
+        "Play tic-tac-toe against a reinforcement learning agent."
         " If no brainfile is specified for a given player,"
         " then that player is assumed to be a human."
-        )
+    )
 )
 parser.add_argument(
     "-p1", "--player1", metavar="P1", help="brainfile for the first player"
@@ -69,6 +70,20 @@ def brain_map():
         brain_map[key] = np.ones((9,), dtype=int) * good_spots
         brain_map[key] *= START_WEIGHT
     return brain_map
+
+
+def write_brain_map(filename, force):
+    if not force and os.path.isfile(filename):
+        print(f"Brainfile {filename} already exists")
+        answer = input("Overwrite? [y/N] ")
+        if answer != "y":
+            print("Quitting")
+            return
+    bmap = brain_map()
+    with open(filename, "wb") as f:
+        print(f"Saving base brain in {filename}")
+        pickle.dump(bmap, f)
+    return
 
 
 # Input Output
@@ -125,10 +140,10 @@ def load_brain(brainfile):
             brainmap = pickle.load(data)
     except FileNotFoundError:
         logging.critical(f"File {brainfile} not found")
-        exit(1)
+        raise
     except pickle.UnpicklingError:
         logging.critical(f"Malformed brainfile in {brainfile}")
-        exit(1)
+        raise
     return brainmap
 
 
@@ -191,7 +206,7 @@ def make_computer_move(player_id, brainmap, state):
 
 # Playing and training
 def self_play(brain_map1, brain_map2):
-    state = "000000000"
+    state = EMPTY_BOARD
     moves = [[], []]
     print_state(state)
     result = 0
@@ -270,7 +285,7 @@ def play_human_computer(brainmap, humanfirst, training):
 
 
 def play_humans():
-    state = "000000000"
+    state = EMPTY_BOARD
     print("Playing human against human")
     print_tutorial()
     result = 0
@@ -291,10 +306,13 @@ def play_humans():
 def play(p1, p2, t1, t2, n):  # path path bool bool int
 
     # Load files
-    if p1 is not None:
-        brainmap1 = load_brain(p1)
-    if p2 is not None:
-        brainmap2 = load_brain(p2)
+    try:
+        if p1 is not None:
+            brainmap1 = load_brain(p1)
+        if p2 is not None:
+            brainmap2 = load_brain(p2)
+    except (FileNotFoundError, pickle.UnpicklingError):
+        raise
 
     # Play
     if p1 is None and p2 is None:
@@ -329,16 +347,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.generate is not None:
-        if not args.force and os.path.isfile(args.generate):
-            print(f"Brainfile {args.generate} already exists")
-            answer = input("Overwrite? [y/N] ")
-            if answer != "y":
-                print("Quitting")
-                exit(0)
-        bmap = brain_map()
-        with open(args.generate, "wb") as f:
-            print(f"Saving base brain in {args.generate}")
-            pickle.dump(bmap, f)
+        write_brain_map(args.generate, args.force)
         exit(0)
 
     if args.quiet:
@@ -351,4 +360,7 @@ if __name__ == "__main__":
     t1 = args.train1 is not None
     t2 = args.train2 is not None
 
-    play(p1, p2, t1, t2, args.iterations)
+    try:
+        play(p1, p2, t1, t2, args.iterations)
+    except (FileNotFoundError, pickle.UnpicklingError):
+        exit(1)
