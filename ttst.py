@@ -1,10 +1,11 @@
 import argparse
 import itertools
 import logging
-import numpy as np
 import os
 import pickle
 import time
+
+import numpy as np
 
 EMPTY_BOARD = "000000000"
 
