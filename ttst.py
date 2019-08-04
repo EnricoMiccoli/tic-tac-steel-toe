@@ -15,7 +15,7 @@ REWARD = 3
 DEFAULT_TRAINING = 5000
 
 # User interface theme
-CHARS = {"0": " ", "1": "X", "2": "O"}
+CHARS = {"0": " ", "1": "O", "2": "X"}
 logging.basicConfig(format="%(message)s")
 
 
@@ -168,7 +168,6 @@ def update_brain(brain_map, moves, delta):
 
 # Game handling
 def game_result(state):
-    # Tie: player 2 wins
     for i in range(3):
         row = state[i * 3 : i * 3 + 3]
         if row == "111":
@@ -192,8 +191,8 @@ def game_result(state):
     if second_diag == "222":
         return 2
     if "0" not in state:
-        assert state.count("1") == state.count("2") - 1
-        return 1
+        assert state.count("2") == state.count("1") - 1
+        return 2  # game is a tie: player 2 wins
     return 0
 
 
@@ -377,43 +376,22 @@ def play_core(bm1, bm2, t1, t2, n):
 
 
 def play(p1, p2, t1, t2, n):  # path path bool bool int
-
-    # Load files
     try:
-        if p1 is not None:
-            brainmap1 = load_brain(p1)
-        if p2 is not None:
-            brainmap2 = load_brain(p2)
+        brainmap1 = load_brain(p1) if p1 is not None else None
+        brainmap2 = load_brain(p2) if p2 is not None else None
     except (FileNotFoundError, pickle.UnpicklingError):
         raise
 
-    # Play
-    if p1 is None and p2 is None:
-        play_humans()
-        return
-    elif p1 is not None and p2 is not None:
-        logging.info(f"Playing computer {p1} against computer {p2}")
-        start = time.monotonic()
-        self_train(brainmap1, brainmap2, n, t1, t2)
-        end = time.monotonic()
-        if t1 or t2:
-            logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
-    elif p1 is not None:
-        play_human_computer(brainmap1, 0, t1)
-    elif p2 is not None:
-        play_human_computer(brainmap2, 1, t2)
-    else:
-        assert False
+    bm1, bm2 = play_core(brainmap1, brainmap2, t1, t2, n)
 
-    # Update
     if t1:
         with open(p1, "wb") as f:
             logging.info("Saving brain updates for computer 1")
-            pickle.dump(brainmap1, f)
+            pickle.dump(bm1, f)
     if t2:
         with open(p2, "wb") as f:
             logging.info("Saving brain updates for computer 2")
-            pickle.dump(brainmap2, f)
+            pickle.dump(bm2, f)
 
 
 if __name__ == "__main__":
