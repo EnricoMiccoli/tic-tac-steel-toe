@@ -109,6 +109,18 @@ def print_tutorial():
     print()
 
 
+def print_message_game_start(humans):
+    players = []
+    for human in humans:
+        players.append("human" if human else "computer")
+    print(f"Playing {players[0]} against {players[1]}")
+
+
+def print_message_game_end(humans, result):
+    name = CHARS[str(result)]
+    logging.debug(f"{name} wins!")
+
+
 def parse_move_linear(instr):
     try:
         x = int(instr)
@@ -301,6 +313,67 @@ def play_humans():
     else:
         assert result == 2
         print("O wins!")
+
+
+def _mover_maker(player_id, human):
+    def mover(state, bm):
+        if human:
+            newstate = make_human_move(player_id, state)
+            return ([], newstate)
+        else:
+            return make_computer_move(player_id, bm, state)
+
+    return mover
+
+
+def play_core(bm1, bm2, t1, t2, n):
+    humans = [x is None for x in [bm1, bm2]]
+    print_message_game_start(humans)
+    print_tutorial() if 1 in humans else None
+
+    ids = ["1", "2"]
+    bms = [bm1, bm2]
+    movers = []
+    for i in range(2):
+        movers.append(_mover_maker(ids[i], humans[i]))
+
+    def looper(matches, iterations):
+        if 1 not in humans:
+            return matches < iterations
+        else:
+            return matches < 1
+
+    start = time.monotonic()
+    matches = 0
+    while looper(matches, n):
+        state = EMPTY_BOARD
+        moves = [[], []]
+        result = 0
+        while result == 0:
+            for mover, record, bm in zip(movers, moves, bms):
+                update = mover(state, bm)
+                record.append((state, update[0]))
+                state = update[1]
+                print_state(state)
+                result = game_result(state)
+                if result != 0:
+                    break
+
+        print_message_game_end(humans, result)
+        if result == 2:
+            update_brain(bm1, moves[0], PENALTY) if t1 else None
+            update_brain(bm2, moves[1], REWARD) if t2 else None
+        else:
+            assert result == 1
+            update_brain(bm1, moves[0], REWARD) if t1 else None
+            update_brain(bm2, moves[1], PENALTY) if t2 else None
+        matches += 1
+
+    end = time.monotonic()
+    if 1 not in humans and (t1 == 1 or t2 == 1):
+        logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
+
+    return bm1, bm2
 
 
 def play(p1, p2, t1, t2, n):  # path path bool bool int
