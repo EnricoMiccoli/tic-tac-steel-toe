@@ -15,7 +15,7 @@ REWARD = 3
 DEFAULT_TRAINING = 5000
 
 # User interface theme
-CHARS = {"0": " ", "1": "X", "2": "O"}
+CHARS = {"0": " ", "1": "O", "2": "X"}
 logging.basicConfig(format="%(message)s")
 
 
@@ -109,6 +109,18 @@ def print_tutorial():
     print()
 
 
+def print_message_game_start(humans):
+    players = []
+    for human in humans:
+        players.append("human" if human else "computer")
+    print(f"Playing {players[0]} against {players[1]}")
+
+
+def print_message_game_end(humans, result):
+    name = CHARS[str(result)]
+    logging.debug(f"{name} wins!")
+
+
 def parse_move_linear(instr):
     try:
         x = int(instr)
@@ -156,7 +168,6 @@ def update_brain(brain_map, moves, delta):
 
 # Game handling
 def game_result(state):
-    # Tie: player 2 wins
     for i in range(3):
         row = state[i * 3 : i * 3 + 3]
         if row == "111":
@@ -180,8 +191,8 @@ def game_result(state):
     if second_diag == "222":
         return 2
     if "0" not in state:
-        assert state.count("1") == state.count("2") - 1
-        return 1
+        assert state.count("2") == state.count("1") - 1
+        return 2  # game is a tie: player 2 wins
     return 0
 
 
@@ -205,142 +216,84 @@ def make_computer_move(player_id, brainmap, state):
 
 
 # Playing and training
-def self_play(brain_map1, brain_map2):
-    state = EMPTY_BOARD
-    moves = [[], []]
-    print_state(state)
-    result = 0
-    while result == 0:
-        iterators = zip(["2", "1"], [brain_map1, brain_map2], moves)
-        for player_id, brainmap, mv in iterators:
-            move, updated = make_computer_move(player_id, brainmap, state)
-            mv.append((state, move))
-            state = updated
-            print_state(state)
-            result = game_result(state)
-            if result != 0:
-                break
-    if result == 1:
-        logging.debug("Computer 2 wins!")
-        return True, moves
-    else:
-        assert result == 2
-        logging.debug("Computer 1 wins!")
-        return False, moves
-
-
-def self_train(brainmap1, brainmap2, n, training1, training2):
-    for i in range(n):
-        result, moves = self_play(brainmap1, brainmap2)
-        if result:
-            update_brain(brainmap2, moves[1], REWARD) if training2 else None
-            update_brain(brainmap1, moves[0], PENALTY) if training1 else None
+def _mover_maker(player_id, human):
+    def mover(state, bm):
+        if human:
+            newstate = make_human_move(player_id, state)
+            return ([], newstate)
         else:
-            update_brain(brainmap2, moves[1], PENALTY) if training2 else None
-            update_brain(brainmap1, moves[0], REWARD) if training1 else None
+            return make_computer_move(player_id, bm, state)
+
+    return mover
 
 
-def play_human_computer(brainmap, humanfirst, training):
-    if humanfirst:
-        print("Playing human against computer")
-    else:
-        print("Playing computer against human")
+def play_core(bm1, bm2, t1, t2, n):
+    humans = [x is None for x in [bm1, bm2]]
+    print_message_game_start(humans)
+    print_tutorial() if 1 in humans else None
 
-    print_tutorial()
-    state = EMPTY_BOARD
-    mv = []
+    ids = ["1", "2"]
+    bms = [bm1, bm2]
+    movers = []
+    for i in range(2):
+        movers.append(_mover_maker(ids[i], humans[i]))
 
-    # TODO use currying instead
-    def _make_computer_move(player_id, state):
-        return make_computer_move(player_id, brainmap, state)
+    def looper(matches, iterations):
+        if 1 not in humans:
+            return matches < iterations
+        else:
+            return matches < 1
 
-    movers = [make_human_move, _make_computer_move]
-    ts = [0, training]
-    humans = [1, 0]
-    if not humanfirst:
-        movers.reverse()
-        ts.reverse()
-        humans.reverse()
-
-    result = 0
-    while result == 0:
-        for player_id, mover, t, human in zip(["2", "1"], movers, ts, humans):
-            update = mover(player_id, state)
-            if human:
-                state = update
-            else:
-                mv.append((state, update[0]))
+    start = time.monotonic()
+    matches = 0
+    while looper(matches, n):
+        state = EMPTY_BOARD
+        moves = [[], []]
+        result = 0
+        while result == 0:
+            for mover, record, bm in zip(movers, moves, bms):
+                update = mover(state, bm)
+                record.append((state, update[0]))
                 state = update[1]
-            print_state(state)
-            result = game_result(state)
-            if result != 0:
-                break
+                print_state(state)
+                result = game_result(state)
+                if result != 0:
+                    break
 
-    if (result == 1 and humanfirst) or (result == 2 and not humanfirst):
-        print("Computer wins!")
-        update_brain(brainmap, mv, REWARD) if training else None
-    else:
-        print("You win!")
-        update_brain(brainmap, mv, PENALTY) if training else None
+        print_message_game_end(humans, result)
+        if result == 2:
+            update_brain(bm1, moves[0], PENALTY) if t1 else None
+            update_brain(bm2, moves[1], REWARD) if t2 else None
+        else:
+            assert result == 1
+            update_brain(bm1, moves[0], REWARD) if t1 else None
+            update_brain(bm2, moves[1], PENALTY) if t2 else None
+        matches += 1
 
+    end = time.monotonic()
+    if 1 not in humans and (t1 == 1 or t2 == 1):
+        logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
 
-def play_humans():
-    state = EMPTY_BOARD
-    print("Playing human against human")
-    print_tutorial()
-    result = 0
-    while result == 0:
-        for player_id in ["2", "1"]:
-            state = make_human_move(player_id, state)
-            print_state(state)
-            result = game_result(state)
-            if result != 0:
-                break
-    if result == 1:
-        print("X wins!")
-    else:
-        assert result == 2
-        print("O wins!")
+    return bm1, bm2
 
 
 def play(p1, p2, t1, t2, n):  # path path bool bool int
-
-    # Load files
     try:
-        if p1 is not None:
-            brainmap1 = load_brain(p1)
-        if p2 is not None:
-            brainmap2 = load_brain(p2)
+        brainmap1 = load_brain(p1) if p1 is not None else None
+        brainmap2 = load_brain(p2) if p2 is not None else None
     except (FileNotFoundError, pickle.UnpicklingError):
         raise
 
-    # Play
-    if p1 is None and p2 is None:
-        play_humans()
-        return
-    elif p1 is not None and p2 is not None:
-        logging.info(f"Playing computer {p1} against computer {p2}")
-        start = time.monotonic()
-        self_train(brainmap1, brainmap2, n, t1, t2)
-        end = time.monotonic()
-        if t1 or t2:
-            logging.info(f"Trained {n} matches in {end - start:.3f} seconds")
-    elif p1 is not None:
-        play_human_computer(brainmap1, 0, t1)
-    elif p2 is not None:
-        play_human_computer(brainmap2, 1, t2)
-    else:
-        assert False
+    bm1, bm2 = play_core(brainmap1, brainmap2, t1, t2, n)
 
-    # Update
     if t1:
         with open(p1, "wb") as f:
             logging.info("Saving brain updates for computer 1")
-            pickle.dump(brainmap1, f)
+            pickle.dump(bm1, f)
     if t2:
         with open(p2, "wb") as f:
             logging.info("Saving brain updates for computer 2")
-            pickle.dump(brainmap2, f)
+            pickle.dump(bm2, f)
 
 
 if __name__ == "__main__":
