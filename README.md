@@ -1,5 +1,10 @@
-# tic-tac-steel-toe
-Yet another reinforcement learning approach to solving tic-tac-toe. Like steel-toe boots: they're boots, but reinforced.
+<p align="center">
+    <img src="img/logo.png" alt="Tic tac steel toe logo">
+</p>
+<h3 align="center">
+    Yet another reinforcement learning approach to solving tic-tac-toe
+</h3>
+Like steel-toe boots: they're boots, but reinforced.
 
 This is the most straightforward, unsophisticated, software implementation of a [MENACE](https://en.wikipedia.org/wiki/Donald_Michie#Career_and_research)-like system I could come up with.
 
